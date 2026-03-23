@@ -1,0 +1,155 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Mon Mar 16 17:51:27 2026
+
+@author: linx
+"""
+
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+import os
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.ndimage import gaussian_filter
+from scipy.stats import ttest_rel
+
+# ---------------- PATH ----------------
+
+freq = "epoch"
+data_original='sensor'
+
+root = f"/nashome2/linx/Desktop/mindeye/ml_data/time_resolved_mvpa_{freq}_{data_original}_coef_topomap"
+
+gat_dir = os.path.join(root, "per_subject")
+
+# ---------------- PARAMETERS ----------------
+t_keep = 376
+times = np.linspace(-1500, 0, t_keep)
+
+baseline = (-1500, -1000)
+encoding = (-700, 0)
+
+# ---------------- LOAD SUBJECT FILES ----------------
+files = sorted([f for f in os.listdir(gat_dir) if f.endswith("_gat.npy")])
+
+print("Found subjects:", len(files))
+
+all_gat = []
+
+for f in files:
+    gat = np.load(os.path.join(gat_dir, f))
+    all_gat.append(gat)
+
+all_gat = np.stack(all_gat, axis=0)
+
+print("Data shape:", all_gat.shape)
+# (subjects, train_time, test_time)
+
+n_subjects = all_gat.shape[0]
+
+# ---------------- TIME INDICES ----------------
+baseline_idx = np.where(
+    (times >= baseline[0]) & (times <= baseline[1])
+)[0]
+
+encoding_idx = np.where(
+    (times >= encoding[0]) & (times <= encoding[1])
+)[0]
+
+print("Baseline samples:", len(baseline_idx))
+print("Encoding samples:", len(encoding_idx))
+
+# ===============================
+# 1. BASELINE STABILITY
+# ===============================
+
+baseline_vals = []
+
+for s in range(n_subjects):
+
+    sub_gat = all_gat[s]
+
+    val = sub_gat[np.ix_(baseline_idx, baseline_idx)].mean()
+
+    baseline_vals.append(val)
+
+baseline_vals = np.array(baseline_vals)
+
+print("\nBaseline stability")
+print("Mean AUC =", baseline_vals.mean())
+print("SD =", baseline_vals.std())
+
+
+# ===============================
+# 2. ENCODING DIAGONAL
+# ===============================
+
+encoding_diag_vals = []
+
+for s in range(n_subjects):
+
+    sub_gat = all_gat[s]
+
+    diag = np.diag(sub_gat)
+
+    val = diag[encoding_idx].mean()
+
+    encoding_diag_vals.append(val)
+
+encoding_diag_vals = np.array(encoding_diag_vals)
+
+print("\nEncoding diagonal")
+print("Mean AUC =", encoding_diag_vals.mean())
+print("SD =", encoding_diag_vals.std())
+
+
+# ===============================
+# 3. ENCODING BOOST
+# ===============================
+
+encoding_boost = encoding_diag_vals - baseline_vals
+
+print("\nEncoding boost (encoding - baseline)")
+print("Mean =", encoding_boost.mean())
+print("SD =", encoding_boost.std())
+
+
+# ===============================
+# 4. STATISTICAL TEST
+# ===============================
+
+t, p = ttest_rel(encoding_diag_vals, baseline_vals)
+
+print("\nPaired t-test (encoding vs baseline)")
+print("t =", t)
+print("p =", p)
+
+
+# ===============================
+# 5. EFFECT SIZE (Cohen's d)
+# ===============================
+
+diff = encoding_diag_vals - baseline_vals
+
+cohens_d = diff.mean() / diff.std()
+
+print("\nEffect size")
+print("Cohen's d =", cohens_d)
+
+
+# ===============================
+# OPTIONAL: SAVE RESULTS
+# ===============================
+
+results = np.column_stack([
+    baseline_vals,
+    encoding_diag_vals,
+    encoding_boost
+])
+
+save_path = os.path.join(root, "gat_quantification.npy")
+np.save(save_path, results)
+
+print("\nSaved subject-level results to:", save_path)
