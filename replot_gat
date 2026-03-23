@@ -1,0 +1,126 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Mon Mar 16 10:30:44 2026
+
+@author: linx
+"""
+
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+import os
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.ndimage import gaussian_filter
+import matplotlib as mpl
+
+mpl.rcParams.update({
+    "font.size": 16,          # 全局默认字体
+    "axes.titlesize": 20,     # title
+    "axes.labelsize": 18,     # x/y label
+    "xtick.labelsize": 16,    # x tick
+    "ytick.labelsize": 16,    # y tick
+    "legend.fontsize": 16,
+    "figure.titlesize": 20
+})
+
+
+# ---------------- PATH ----------------
+freq = "epoch"
+data_original='sensor'
+
+root = f"/nashome2/linx/Desktop/mindeye/ml_data/time_resolved_mvpa_{freq}_{data_original}_coef_topomap"
+
+gat_dir = os.path.join(root, "per_subject")
+
+# ---------------- PARAMETERS ----------------
+t_keep = 376
+times = np.linspace(-1500, 0, t_keep)
+
+baseline = (-1500, -1000)
+
+do_gat_smooth = True
+gat_smooth_sigma = 1.0
+
+# ---------------- FIND SUBJECT FILES ----------------
+files = [f for f in os.listdir(gat_dir) if f.endswith("_gat.npy")]
+files = sorted(files)
+
+print("Found subjects:", len(files))
+
+# ---------------- LOAD GAT ----------------
+all_gat = []
+
+for f in files:
+    path = os.path.join(gat_dir, f)
+    gat = np.load(path)
+    all_gat.append(gat)
+
+all_gat = np.stack(all_gat, axis=0)
+
+print("Data shape:", all_gat.shape)
+# (subjects, train_time, test_time)
+
+# ---------------- GROUP MEAN ----------------
+group_mean_gat = all_gat.mean(axis=0)
+
+# ---------------- BASELINE INDEX ----------------
+baseline_idx = np.where(
+    (times >= baseline[0]) & (times <= baseline[1])
+)[0]
+
+print("Baseline samples:", len(baseline_idx))
+
+# ---------------- BASELINE MEAN ----------------
+baseline_mean = group_mean_gat[np.ix_(baseline_idx, baseline_idx)].mean()
+
+print("Baseline mean AUC =", baseline_mean)
+
+# ---------------- OPTIONAL SMOOTH ----------------
+gat_plot = group_mean_gat.copy()
+
+if do_gat_smooth:
+    gat_plot = gaussian_filter(gat_plot, sigma=gat_smooth_sigma)
+
+# ---------------- CENTER SCALE ON BASELINE ----------------
+max_dev = np.max(np.abs(group_mean_gat - baseline_mean))
+
+vmin_val = baseline_mean - max_dev
+vmax_val = baseline_mean + max_dev
+
+print("Color scale:", vmin_val, vmax_val)
+
+# ---------------- PLOT ----------------
+plt.figure(figsize=(6,5))
+
+im = plt.imshow(
+    gat_plot,
+    origin="lower",
+    aspect="auto",
+    extent=[times[0], times[-1], times[0], times[-1]],
+    vmin=vmin_val,
+    vmax=vmax_val,
+    cmap="RdBu_r"
+)
+
+plt.xlabel("Test time (ms)")
+plt.ylabel("Train time (ms)")
+plt.title("Group mean temporal generalization (AUC)", pad=15)
+
+ticks = np.arange(-1500, 1, 250)
+
+plt.xticks(ticks)
+plt.yticks(ticks)
+
+cbar = plt.colorbar(im, fraction=0.046, pad=0.03)
+cbar.ax.tick_params(labelsize=16)
+
+
+
+save_path = os.path.join(root, "group_gat_baseline_center.png")
+plt.savefig(save_path, dpi=300, bbox_inches="tight")
+
+plt.show()
+
+print("Saved to:", save_path)
