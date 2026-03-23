@@ -1,39 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Fri Mar 20 14:04:15 2026
-
-@author: linx
-"""
-
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
 Group-level full-pattern topomap (指定时间窗 + 自动中心化)
 For patterns shape: (n_features, n_times)
-Author: Linx + ChatGPT
-Date: 2026-03-20
-"""
-import os
-import numpy as np
-import mne
-import matplotlib.pyplot as plt
-
-# ---------------------- 用户设置 ----------------------
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Fri Mar 20 14:04:15 2026
-
-@author: linx
-"""
-
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Group-level full-pattern topomap (指定时间窗 + 自动中心化)
-For patterns shape: (n_features, n_times)
-Author: Linx + ChatGPT
+Author: Linx
 Date: 2026-03-20
 """
 import os
